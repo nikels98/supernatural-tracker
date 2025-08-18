@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Supernatural Episoden‑Tracker</title>
+<style>
+  :root{
+    --bg:#ffffff; --text:#0b0f19; --muted:#516077; --line:#e6e9ef;
+    --card:#f7f9fc; --accent:#0058ff; --ok:#18a957; --special:#fff7d6;
+  }
+  [data-theme="dark"]{
+    --bg:#0b0f19; --text:#ffffff; --muted:#aab4c3; --line:#2a2f3a;
+    --card:#1a1f2b; --accent:#3399ff; --ok:#2ecc71; --special:#2d2614;
+  }
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system, BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial}
+  header{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:saturate(1.1) blur(8px);border-bottom:1px solid var(--line);
+    transition:transform .35s cubic-bezier(.22,.61,.36,1), opacity .3s ease; will-change:transform,opacity; pointer-events:auto}
+  [data-theme="dark"] header{background:rgba(11,15,25,.94)}
+  header.hide{transform:translateY(-110%);opacity:0;pointer-events:none}
+  .wrap{max-width:1100px;margin:0 auto;padding:14px 16px;position:relative}
+  h1{margin:0 0 6px 0;font-size:clamp(20px,4vw,28px);letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:13px}
+  .darkToggle{position:absolute;top:14px;right:16px;cursor:pointer;background:var(--card);padding:6px 12px;border-radius:12px;border:1px solid var(--line)}
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:10px;margin-top:10px}
+  .pill{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+  .pill b{display:block;font-size:18px}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  button{background:var(--card);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:12px;cursor:pointer}
+  button:hover{border-color:#cfd6e6}
+  details{border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:12px 0;background:var(--bg);box-shadow:0 2px 10px rgba(10,20,40,.04)}
+  summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
+  summary::-webkit-details-marker{display:none}
+  .badge{color:var(--muted);font-size:12px}
+  .done{color:var(--ok);font-weight:700;margin-left:8px}
+  .season{padding:12px 14px}
+  .list{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .row{display:grid;grid-template-columns:100px 1fr 70px;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);align-items:center}
+  .row:last-child{border-bottom:none}
+  .code{font-variant-numeric:tabular-nums;font-weight:700}
+  .specialRow{background:var(--special)}
+  .foot{color:var(--muted);font-size:12px;margin-top:8px}
+  .float{position:fixed;right:14px;bottom:14px;padding:12px 14px;background:#0b1222;color:#fff;border-radius:16px}
+  .float .k{font-size:12px;opacity:.9;color:#ccd4e6}
+  .float b{display:block;font-size:18px}
+  @media (max-width:860px){.grid{grid-template-columns:repeat(2,1fr)} .row{grid-template-columns:88px 1fr 60px}}
+</style>
+</head>
+<body>
+<header id="topbar">
+  <div class="wrap">
+    <h1>Supernatural Episoden‑Tracker</h1>
+    <div class="sub">Staffeln 1–15 • Specials = Cas, Crowley, MoL, Zeitreisen, Gabriel & Co.</div>
+    <div class="darkToggle" id="darkToggle">🌙 Dark</div>
+    <div class="grid">
+      <div class="pill"><div class="k">Special Folgen (gesamt)</div><b id="specialTotal">—</b></div>
+      <div class="pill"><div class="k">Alle Folgen (gesamt)</div><b id="allTotal">—</b></div>
+      <div class="pill"><div class="k">Übrig – Special</div><b id="remBest">—</b></div>
+      <div class="pill"><div class="k">Übrig – Alle</div><b id="remAll">—</b></div>
+    </div>
+    <div class="toolbar">
+      <button id="toggleBest">Nur Specials</button>
+      <button id="showAll">Alles</button>
+      <button id="reset">Alle Haken löschen</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap" id="host"></div>
+
+<div class="float">
+  <div class="k">Alle übrig</div><b id="miniAll">—</b>
+  <div class="k" style="margin-top:6px">Special übrig</div><b id="miniBest">—</b>
+</div>
+
+<script>
+/* ---- Data ---- */
+const FULL = {1:22,2:22,3:16,4:22,5:22,6:22,7:23,8:23,9:23,10:23,11:23,12:23,13:23,14:20,15:20};
+
+// Specials (S1–9 wie besprochen) + S10–15 erweitert: Cas, Crowley, MoL, Gabriel, Zeitreisen, Fun (z.B. Baby)
+const SPECIAL = new Set([
+  // S1–9
+  "1x01","1x09","1x16","1x19","1x21","1x22",
+  "2x01","2x10","2x14","2x15","2x18","2x20","2x21","2x22",
+  "3x01","3x03","3x11","3x12","3x13","3x16",
+  "4x01","4x03","4x06","4x07","4x08","4x09","4x10","4x18","4x20","4x21","4x22",
+  "5x01","5x03","5x04","5x08","5x09","5x10","5x13","5x20","5x21","5x22",
+  "6x01","6x03","6x05","6x07","6x09","6x10","6x15","6x17","6x18","6x20","6x21","6x22",
+  "7x01","7x02","7x10","7x17","7x21","7x23",
+  "8x01","8x02","8x07","8x08","8x10","8x12","8x13","8x14","8x17","8x19","8x21","8x22","8x23",
+  "9x01","9x03","9x04","9x06","9x09","9x10","9x11","9x16","9x18","9x21","9x22","9x23",
+  // S10 – Cas/Crowley/MoL + Fan-Favorites
+  "10x01","10x02","10x03","10x05","10x07","10x09","10x10","10x14","10x17","10x18","10x19","10x21","10x22","10x23",
+  // S11 – inkl. Baby (11x04), Shurley (11x20)
+  "11x01","11x03","11x04","11x09","11x10","11x11","11x18","11x20","11x21","11x23",
+  // S12 – MoL-Arc, Cas/Crowley stark, Finale
+  "12x01","12x02","12x09","12x12","12x14","12x20","12x22","12x23",
+  // S13 – Gabriel/Trickster & Scoobynatural
+  "13x01","13x04","13x10","13x16","13x18","13x20","13x22","13x23",
+  // S14 – Michael-Arc + „Lebanon“ (300th) + Finale
+  "14x01","14x10","14x13","14x19","14x20",
+  // S15 – Road to the End
+  "15x01","15x04","15x09","15x13","15x18","15x19","15x20"
+]);
+
+const AVG_MIN = 42;
+
+// Two-parters (wird neben der Code-Nr. angezeigt)
+const PARTS = {
+  "1x21":"Teil 1","1x22":"Teil 2",
+  "2x21":"Teil 1","2x22":"Teil 2",
+  "4x21":"Teil 1","4x22":"Teil 2",
+  "5x21":"Teil 1","5x22":"Teil 2",
+  "8x22":"Teil 1","8x23":"Teil 2",
+  "9x22":"Teil 1","9x23":"Teil 2",
+  "10x22":"Teil 1","10x23":"Teil 2",
+  "15x19":"Teil 1","15x20":"Teil 2"
+};
+
+/* ---- State ---- */
+const LS_W = "spn_watched_v3";
+const LS_O = "spn_open_v3";
+const LS_T = "spn_theme";
+let WATCHED = JSON.parse(localStorage.getItem(LS_W)||"{}");
+let OPEN = JSON.parse(localStorage.getItem(LS_O)||"{}");
+let ONLY_SPECIAL = false;
+
+/* Theme init */
+const root = document.documentElement;
+const savedTheme = localStorage.getItem(LS_T);
+if(savedTheme==="dark"){ root.setAttribute("data-theme","dark"); }
+document.getElementById("darkToggle").onclick = () => {
+  const dark = root.getAttribute("data-theme")==="dark";
+  if(dark){ root.removeAttribute("data-theme"); localStorage.setItem(LS_T,"light"); }
+  else { root.setAttribute("data-theme","dark"); localStorage.setItem(LS_T,"dark"); }
+};
+
+/* Header hide/show on scroll */
+let lastY = 0;
+const topbar = document.getElementById('topbar');
+window.addEventListener('scroll', () => {
+  const y = window.scrollY || document.documentElement.scrollTop;
+  const goingDown = y > lastY + 5;
+  const goingUp = y < lastY - 5;
+  if (y <= 10) { topbar.classList.remove('hide'); }
+  else if (goingDown) { topbar.classList.add('hide'); }
+  else if (goingUp) { topbar.classList.remove('hide'); }
+  lastY = y;
+}, {passive:true});
+
+const $ = s => document.querySelector(s);
+const host = $("#host");
+function seasonCodes(s){ return Array.from({length:FULL[s]},(_,i)=>`${s}x${String(i+1).padStart(2,'0')}`) }
+function save(){ localStorage.setItem(LS_W, JSON.stringify(WATCHED)); }
+function fmtHours(min){ const h = min/60; return h>=10 ? h.toFixed(0)+"h" : h.toFixed(1)+"h"; }
+
+/* ---- Render ---- */
+function render(){
+  host.innerHTML = "";
+  const allTotal = Object.values(FULL).reduce((a,b)=>a+b,0);
+  let specialTotal = 0;
+
+  for(let s=1;s<=15;s++) specialTotal += seasonCodes(s).filter(c=>SPECIAL.has(c)).length;
+
+  $("#allTotal").textContent = allTotal;
+  $("#specialTotal").textContent = specialTotal;
+
+  let seenAll=0, seenSpec=0;
+  for(let s=1;s<=15;s++){
+    const codes = seasonCodes(s);
+    const seen = codes.filter(c=>WATCHED[c]);
+    const spec = codes.filter(c=>SPECIAL.has(c));
+    const seenSpecArr = spec.filter(c=>WATCHED[c]);
+
+    seenAll += seen.length;
+    seenSpec += seenSpecArr.length;
+
+    const det = document.createElement("details");
+    det.open = !!OPEN[s];
+    det.addEventListener("toggle", ()=>{ OPEN[s]=det.open; localStorage.setItem(LS_O, JSON.stringify(OPEN)); });
+
+    const sum = document.createElement("summary");
+    sum.innerHTML = `<strong>Staffel ${s}</strong> <span class="badge">• Special: ${spec.length} · Alle: ${codes.length}</span> <span class="badge">• gesehen: ${seen.length}/${codes.length}</span>`;
+    if(seen.length===codes.length){ const d=document.createElement('span'); d.className='done'; d.textContent='✔ Staffel fertig'; sum.appendChild(d); }
+    det.appendChild(sum);
+
+    const inner = document.createElement("div"); inner.className="season";
+
+    const btns = document.createElement("div"); btns.className="toolbar";
+    const b1 = document.createElement("button"); b1.textContent="Staffel abhaken";
+    b1.onclick=()=>{ codes.forEach(c=>WATCHED[c]=true); save(); render(); };
+    const b2 = document.createElement("button"); b2.textContent="Haken löschen";
+    b2.onclick=()=>{ codes.forEach(c=>delete WATCHED[c]); save(); render(); };
+    btns.append(b1,b2); inner.appendChild(btns);
+
+    const list = document.createElement("div"); list.className="list";
+    codes.forEach(code=>{
+      const isSpec = SPECIAL.has(code);
+      if(ONLY_SPECIAL && !isSpec) return;
+      const row = document.createElement("div"); row.className = "row"+(isSpec?" specialRow":"");
+      const c = document.createElement("div"); c.className="code"; c.textContent=code;
+      const t = document.createElement("div"); t.textContent = PARTS[code] ? PARTS[code] : "";
+      const w = document.createElement("div");
+      const cb = document.createElement("input"); cb.type='checkbox'; cb.checked=!!WATCHED[code];
+      cb.onchange=()=>{ if(cb.checked) WATCHED[code]=true; else delete WATCHED[code]; save(); render(); };
+      w.appendChild(cb);
+      row.append(c,t,w); list.appendChild(row);
+    });
+    inner.appendChild(list);
+
+    const leftSpec = (spec.length - seenSpecArr.length) * AVG_MIN;
+    const leftAll = (codes.length - seen.length) * AVG_MIN;
+    const foot = document.createElement("div"); foot.className="foot";
+    foot.innerHTML = `Übrig – Special: <b>${fmtHours(leftSpec)}</b> (${spec.length - seenSpecArr.length} Folgen) &nbsp;|&nbsp; Übrig – Alle: <b>${fmtHours(leftAll)}</b> (${codes.length - seen.length} Folgen)`;
+    inner.appendChild(foot);
+
+    det.appendChild(inner);
+    host.appendChild(det);
+  }
+
+  const leftAllMin = (Object.values(FULL).reduce((a,b)=>a+b,0) - seenAll) * AVG_MIN;
+  const leftSpecMin = (specialTotal - seenSpec) * AVG_MIN;
+  $("#remAll").textContent = fmtHours(leftAllMin);
+  $("#remBest").textContent = fmtHours(leftSpecMin);
+  $("#miniAll").textContent = fmtHours(leftAllMin);
+  $("#miniBest").textContent = fmtHours(leftSpecMin);
+}
+
+/* ---- UI ---- */
+document.getElementById("toggleBest").onclick = ()=>{ ONLY_SPECIAL = true; render(); };
+document.getElementById("showAll").onclick   = ()=>{ ONLY_SPECIAL = false; render(); };
+document.getElementById("reset").onclick     = ()=>{ if(confirm("Alle Haken wirklich löschen?")){ WATCHED={}; save(); render(); } };
+
+/* ---- init ---- */
+render();
+</script>
+</body>
+</html>
